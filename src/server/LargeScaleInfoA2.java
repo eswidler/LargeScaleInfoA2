@@ -147,9 +147,10 @@ public class LargeScaleInfoA2 extends HttpServlet {
 	private String getMessage(String sessionID) {
 		String out = "<big><big><b>";
 		
-		if(sessionTable.containsKey(sessionID + "")){
-			if(sessionTable.get(sessionID + "").get("message") != ""){
-				out += sessionTable.get(sessionID + "").get("message");
+		if(sessionTable.containsKey(sessionID)){
+			//Check if there is anything but the default blank message
+			if(sessionTable.get(sessionID).get("message") != ""){
+				out += sessionTable.get(sessionID).get("message");
 			} else{
 				out += "Hello, User!";
 			}
@@ -169,8 +170,8 @@ public class LargeScaleInfoA2 extends HttpServlet {
 	private String getSessionLoc(String sessionID) {
 		String out = "<p>Session on ";
 		
-		if(sessionTable.containsKey(sessionID + "")){
-			out += sessionTable.get(sessionID + "").get("location");
+		if(sessionTable.containsKey(sessionID)){
+			out += sessionTable.get(sessionID).get("location");
 		} else{
 			out += "Issue with cookies";
 		}
@@ -186,8 +187,8 @@ public class LargeScaleInfoA2 extends HttpServlet {
 	private String getSessionExp(String sessionID) {
 		String out = "<p>Expires ";
 		
-		if(sessionTable.containsKey(sessionID + "")){
-			out += sessionTable.get(sessionID + "").get("expiration-timestamp");
+		if(sessionTable.containsKey(sessionID)){
+			out += sessionTable.get(sessionID).get("expiration-timestamp");
 		} else{
 			out += "Issue with cookies";
 		}
