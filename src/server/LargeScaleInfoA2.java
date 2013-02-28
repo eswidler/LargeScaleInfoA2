@@ -1,27 +1,44 @@
 package server;
 
-import java.io.*; 
-import java.util.*;
-import java.net.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Hashtable;
 
-import javax.servlet.*;
-import javax.servlet.annotation.*;
-import javax.servlet.http.*;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 @WebServlet("/")
 public class LargeScaleInfoA2 extends HttpServlet {
 	//Servlet metadata
 	private static final long serialVersionUID = 1L;
 	
+	//Cookie expiration duration, in minutes
+	private static final int cookieDuration = 1;
+	
+	private static final DateFormat df = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+
+	
 	//Hashtable of sessionIDs to a table of information on their message, location, and expiration data.
 	Hashtable<String,Hashtable<String,String>> sessionTable = new Hashtable<String,Hashtable<String,String>>();
 	
 	//Cookie name that is searched for in this project
 	String a2CookieName = "CS5300PROJ1SESSION";
+	
+
 
 	/*
 	 * Base method handling requests
-	 * 
 	 */
 	@Override
 	public void doGet(HttpServletRequest request,HttpServletResponse response)	throws ServletException, IOException {
@@ -64,7 +81,11 @@ public class LargeScaleInfoA2 extends HttpServlet {
 			Hashtable<String, String> sessionValues = new Hashtable<String, String>();
 			sessionValues.put("version", 1 +"");
 			sessionValues.put("message", "");
-			sessionValues.put("expiration-timestamp", "test timestamp");
+			
+			// create new timestamp
+			Calendar cal = Calendar.getInstance();
+			cal.add(Calendar.MINUTE, cookieDuration);
+			sessionValues.put("expiration-timestamp", df.format(cal.getTime()));
 			try {
 				sessionValues.put("location", InetAddress.getLocalHost().toString());
 			} catch (UnknownHostException e) {
@@ -113,7 +134,6 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		//Update relevant session's expiration 
 		else if(cmd.equals("Refresh")){
 			System.out.println("Refresh command");
-			
 		} 
 		//Destroy relevant session 
 		else if(cmd.equals("LogOut")){
@@ -149,7 +169,7 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		
 		if(sessionTable.containsKey(sessionID)){
 			//Check if there is anything but the default blank message
-			if(sessionTable.get(sessionID).get("message") != ""){
+			if(sessionTable.get(sessionID).get("message") != ""){				
 				out += sessionTable.get(sessionID).get("message");
 			} else{
 				out += "Hello, User!";
@@ -188,7 +208,25 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		String out = "<p>Expires ";
 		
 		if(sessionTable.containsKey(sessionID)){
-			out += sessionTable.get(sessionID).get("expiration-timestamp");
+			out += sessionTable.get(sessionID).get("expiration-timestamp");			
+			String expirationDate = sessionTable.get(sessionID).get("expiration-timestamp");
+			Date cookieDate = null;
+			Date currentDate = new Date();
+			
+			try {
+				cookieDate = df.parse(expirationDate);
+			} catch (ParseException e) {
+				System.out.println("Cookie Date Parse Error");
+			}
+						
+			if (cookieDate.after(currentDate)) {
+				long ms = cookieDate.getTime() - currentDate.getTime();
+				Double minutes = (double)(ms/(1000.0 * 60.0));
+				out += String.format(", %f minutes from now.", minutes);
+			} else {
+				sessionTable.remove(sessionID);
+			}
+			
 		} else{
 			out += "Issue with cookies";
 		}
