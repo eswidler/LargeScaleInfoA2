@@ -52,6 +52,8 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		out.println(getMessage(sessionID));
 		out.println(getForm());
 		out.println(getSessionLoc(sessionID));
+		out.println(getVersionNumber(sessionID));
+		out.println(getSessionID(sessionID));
 		out.println(getSessionExp(sessionID));
 		
 		out.println("</body>\n</html>");
@@ -66,8 +68,11 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		
 		//Check if there is a relevant cookie and extract sessionID
 		if(request.getCookies() != null){
+			System.out.println("old cookie");
 			for(Cookie c : request.getCookies()){
-				if(c.getName().equals(a2CookieName) && sessionTable.containsKey(c.getValue() + "")){
+//				Hashtable<String,String> parsed= parseCookieValue(c.getValue());
+//				System.out.println(c.getValue());
+				if(c.getName().equals(a2CookieName) && sessionTable.containsKey(c.getValue())){
 					a2Cookie = c;
 					sessionID = c.getValue();
 				}
@@ -75,8 +80,8 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		}
 		//If no cookie was found, generate a new one 
 		if(a2Cookie == null){
+			System.out.println(" -- new cookie --");
 			sessionID = getNextSessionID();
-			a2Cookie = new Cookie(a2CookieName, sessionID + "");
 			
 			Hashtable<String, String> sessionValues = new Hashtable<String, String>();
 			sessionValues.put("version", 1 +"");
@@ -92,10 +97,15 @@ public class LargeScaleInfoA2 extends HttpServlet {
 				sessionValues.put("location", "Unknown host");
 			}
 			sessionTable.put(sessionID + "", sessionValues);
+			String cookieVal = "sessionID="+sessionID+";";
+			Hashtable<String,String> parsed= parseCookieValue(cookieVal);
+			a2Cookie = new Cookie(a2CookieName, parsed.get("sessionID"));
+			response.addCookie(a2Cookie);
 		}
 		
 		//Add cookie to response regardless, as it always contains new expiration and version information
 		response.addCookie(a2Cookie);
+		System.out.println("cookie val: " + a2Cookie.getValue());
 		return sessionID;
 	}
 	
@@ -118,7 +128,7 @@ public class LargeScaleInfoA2 extends HttpServlet {
 	/*
 	 * Examines the request for the 'cmd' value, and performs the pertinent action
 	 */
-	private void handleCommand(HttpServletRequest request, PrintWriter out, String sessionID) {
+	private void handleCommand(HttpServletRequest request, PrintWriter out, String sessionID){
 		String cmd = request.getParameter("cmd");
 		
 		//Don't do anything if no command was provided
@@ -142,6 +152,30 @@ public class LargeScaleInfoA2 extends HttpServlet {
 			out.write("<html>\n<body>\n<br>&nbsp;\n<br><big><big><b>Bye!<br>&nbsp;<br>\n</b></big></big>\n</body>\n</html>");
 			out.close();
 		} 
+		else{
+			int oldVersion = Integer.parseInt(sessionTable.get(sessionID).get("version"));
+			sessionTable.get(sessionID).put("version", ((Integer)(oldVersion + 1)).toString());
+			String date = sessionTable.get(sessionID).get("expiration-timestamp");
+			Date oldExprTime = new Date();
+			try {
+				oldExprTime = new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy").parse(date);
+			} catch (ParseException e) {
+				System.out.println("Failure in parsing date");
+			}
+			Date newExprDate = new Date(oldExprTime.getTime()+(1000*60*5));
+			sessionTable.get(sessionID).put("expiration-timestamp", newExprDate.toString());
+			//Update message for session
+			if(cmd.equals("Replace")){
+				System.out.println("Replace command");
+				String message = request.getParameter("NewText");
+				sessionTable.get(sessionID).put("message", message);
+			}
+			//Update relevant session's expiration 
+			else if(cmd.equals("Refresh")){
+				System.out.println("Refresh command");
+				
+			} 
+		}
 	}
 
 	/*
@@ -234,5 +268,48 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		out += "</p>";
 		
 		return out;
+	}
+	
+	private String getVersionNumber(String sessionID) {
+		String out = "<p>Version Number: ";
+		
+		if(sessionTable.containsKey(sessionID)){
+			out += sessionTable.get(sessionID).get("version");
+		} else{
+			out += "Issue with cookies";
+		}
+		
+		out += "</p>";
+		
+		return out;
+	}
+
+	private String getSessionID(String sessionID) {
+		String out = "<p>SessionID: ";
+		
+		if(sessionTable.containsKey(sessionID)){
+			out += sessionID;
+		} else{
+			out += "Issue with cookies";
+		}
+		
+		out += "</p>";
+		
+		return out;
+	}	
+	
+	private Hashtable<String,String> parseCookieValue(String cookieVal){
+		Hashtable<String,String> parsed= new Hashtable<String,String>();
+		String[] semicolonParsed = cookieVal.split(";");
+		for (String s: semicolonParsed){
+			String[] kv = s.split("=");
+			if (kv.length == 2){
+				parsed.put(kv[0], kv[1]);
+			}
+			else{
+				parsed.put(kv[0], "");
+			}
+		}
+		return parsed;
 	}
 }
