@@ -148,12 +148,14 @@ public class LargeScaleInfoA2 extends HttpServlet {
 			String date = sessionTable.get(sessionID).get("expiration-timestamp");
 			Date oldExprTime = new Date();
 			try {
-				oldExprTime = new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy").parse(date);
+				oldExprTime = df.parse(date);
 			} catch (ParseException e) {
 				System.out.println("Failure in parsing date");
 			}
-			Date newExprDate = new Date(oldExprTime.getTime()+(1000*60*5));
-			sessionTable.get(sessionID).put("expiration-timestamp", newExprDate.toString());
+
+			Calendar cal = Calendar.getInstance();
+			cal.add(Calendar.MINUTE, cookieDuration);	
+			sessionTable.get(sessionID).put("expiration-timestamp", df.format(cal.getTime()));
 			//Update message for session
 			if(cmd.equals("Replace")){
 				System.out.println("Replace command");
