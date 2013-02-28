@@ -135,16 +135,6 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		if(cmd == null){
 			return;
 		} 
-		//Update message for session
-		else if(cmd.equals("Replace")){
-			System.out.println("Replace command");
-			String message = request.getParameter("NewText");
-			sessionTable.get(sessionID).put("message", message);
-		}
-		//Update relevant session's expiration 
-		else if(cmd.equals("Refresh")){
-			System.out.println("Refresh command");
-		} 
 		//Destroy relevant session 
 		else if(cmd.equals("LogOut")){
 			System.out.println("LogOut command");
