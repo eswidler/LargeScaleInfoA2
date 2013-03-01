@@ -10,7 +10,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Hashtable;
-import java.util.Map;
+import java.util.UUID;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -52,8 +52,6 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		out.println(getMessage(sessionID));
 		out.println(getForm());
 		out.println(getSessionLoc(sessionID));
-		//		out.println(getVersionNumber(sessionID));
-		//		out.println(getSessionID(sessionID));
 		out.println(getSessionExp(sessionID));
 
 		out.println("</body>\n</html>");
@@ -70,21 +68,17 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		if((request.getCookies() != null) && (request.getCookies().length > 0) && (sessionTable.size() > 0)){
 			System.out.println(" -- old cookie -- ");
 			for(Cookie c : request.getCookies()){
-				//				System.out.println(c.getValue().length());
-
 				if(c.getName().equals(a2CookieName) && sessionTable.containsKey(c.getValue())) {
 					a2Cookie = c;
 					sessionID = c.getValue();
-//					System.out.println("SessionID: " + sessionID);
 				}
 			}
 		}
 
-		if (a2Cookie == null) { 		//If no cookie was found, generate a new one 
-
+		//If no cookie was found, generate a new one
+		if (a2Cookie == null) { 		 
 			System.out.println(" -- new cookie --");
 			sessionID = getNextSessionID();
-//			System.out.println(sessionID);
 
 			// create new timestamp
 			Calendar cal = Calendar.getInstance();
@@ -99,6 +93,9 @@ public class LargeScaleInfoA2 extends HttpServlet {
 			} catch (UnknownHostException e) {
 				sessionValues.put("location", "Unknown host");
 			}
+			
+			
+			
 			sessionTable.put(sessionID + "", sessionValues);
 			String cookieVal = "sessionID="+sessionID+";";
 			Hashtable<String,String> parsed= parseCookieValue(cookieVal);
@@ -116,16 +113,7 @@ public class LargeScaleInfoA2 extends HttpServlet {
 	 * Determines the next available sessionID for use
 	 */
 	private String getNextSessionID(){
-		int sessionID = 1;
-
-		while(true){
-			if(!sessionTable.containsKey(sessionID + "")){
-				break;
-			}
-			sessionID++;
-		}
-
-		return sessionID + "";
+		return UUID.randomUUID().toString();
 	}
 
 	/*
@@ -150,7 +138,6 @@ public class LargeScaleInfoA2 extends HttpServlet {
 			return;
 		} else {
 			String cookieVal="sessionID="+sessionID+",";
-
 			//update version number
 			if ((sessionID != null) && sessionTable.contains(sessionID)) {
 				int oldVersion = Integer.parseInt(sessionTable.get(sessionID).get("version"));
