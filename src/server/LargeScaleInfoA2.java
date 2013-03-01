@@ -47,6 +47,14 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		String sessionID = "-1";
 		Cookie a2Cookie = null;
 		
+		try{
+			System.out.println(request.getCookies().toString());
+		} catch (NullPointerException e){
+			System.out.println("no cookies");
+		}
+		
+		
+		
 		//Check if there is a relevant cookie and extract sessionID
 		if(request.getCookies() != null){
 			for(Cookie c : request.getCookies()){
@@ -59,14 +67,18 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		//If no cookie was found, generate a new one 
 		if(a2Cookie == null){
 			sessionID = getNextSessionID();
-			a2Cookie = new Cookie(a2CookieName, sessionID + "");
+			//a2Cookie = new Cookie(a2CookieName, sessionID + "");
+			String cookieVal = "sessionID="+sessionID;
+			a2Cookie = new Cookie(a2CookieName, cookieVal);
+			
+			System.out.println(a2Cookie.getValue());
 			
 			Hashtable<String, String> sessionValues = new Hashtable<String, String>();
 			sessionValues.put("version", 1 +"");
 			sessionValues.put("message", "");
 			sessionValues.put("expiration-timestamp", "test timestamp");
 			try {
-				sessionValues.put("location", InetAddress.getLocalHost().toString());
+				sessionValues.put("location", InetAddress.getLocalHost().getHostAddress() + ":" + request.getLocalPort());
 			} catch (UnknownHostException e) {
 				sessionValues.put("location", "Unknown host");
 			}
