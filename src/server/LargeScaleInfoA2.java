@@ -35,6 +35,8 @@ public class LargeScaleInfoA2 extends HttpServlet {
 
 	//Cookie name that is searched for in this project
 	String a2CookieName = "CS5300PROJ1SESSION";
+	
+	//Garbage Collector - cleans up expired sessions from sessionTable
 	GarbageCollector janitorThread = new GarbageCollector("name");
 
 	/*
@@ -45,7 +47,7 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		PrintWriter out = response.getWriter();
 
 		String sessionID = handleCookie(request, response);
-		handleCommand(request, out, sessionID);
+		handleCommand(response, request, out, sessionID);
 
 		out.println("<html>\n<body>\n<br>&nbsp;<br>");
 
@@ -65,12 +67,15 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		Cookie a2Cookie = null;
 
 		//Check if there is a relevant cookie and extract sessionID
-		if((request.getCookies() != null) && (request.getCookies().length > 0) && (sessionTable.size() > 0)){
-			System.out.println(" -- old cookie -- ");
+		if(request.getCookies() != null){
+			System.out.println("old cookie");
 			for(Cookie c : request.getCookies()){
-				if(c.getName().equals(a2CookieName) && sessionTable.containsKey(c.getValue())) {
+				Hashtable<String,String> parsed= parseCookieValue(c.getValue());
+//				System.out.println(c.getValue());
+				if(c.getName().equals(a2CookieName) && sessionTable.containsKey(parsed.get("sessionID"))){
 					a2Cookie = c;
-					sessionID = c.getValue();
+					sessionID = parsed.get("sessionID");
+//					System.out.println("SessionID: " + sessionID);
 				}
 			}
 		}
@@ -89,7 +94,8 @@ public class LargeScaleInfoA2 extends HttpServlet {
 			sessionValues.put("message", "");
 			sessionValues.put("expiration-timestamp", df.format(cal.getTime()));
 			try {
-				sessionValues.put("location", InetAddress.getLocalHost().toString());
+				String ip= InetAddress.getLocalHost().getHostAddress() + ":" + request.getLocalPort();
+				sessionValues.put("location", ip);
 			} catch (UnknownHostException e) {
 				sessionValues.put("location", "Unknown host");
 			}
@@ -97,15 +103,17 @@ public class LargeScaleInfoA2 extends HttpServlet {
 			
 			
 			sessionTable.put(sessionID + "", sessionValues);
-			String cookieVal = "sessionID="+sessionID+";";
-			Hashtable<String,String> parsed= parseCookieValue(cookieVal);
-			a2Cookie = new Cookie(a2CookieName, parsed.get("sessionID"));
-			response.addCookie(a2Cookie);
+			String cookieVal = "sessionID="+sessionID+",";
+			for (String key: sessionValues.keySet()){
+				cookieVal+=key+"="+sessionValues.get(key)+",";
+			}
+			a2Cookie = new Cookie(a2CookieName, cookieVal);
+//			response.addCookie(a2Cookie);
 		}
 
 		//Add cookie to response regardless, as it always contains new expiration and version information
 		response.addCookie(a2Cookie);
-		System.out.println("cookie val: " + a2Cookie.getValue());
+//		System.out.println("cookie val: " + a2Cookie.getValue());
 		return sessionID;
 	}
 
@@ -119,7 +127,7 @@ public class LargeScaleInfoA2 extends HttpServlet {
 	/*
 	 * Examines the request for the 'cmd' value, and performs the pertinent action
 	 */
-	private void handleCommand(HttpServletRequest request, PrintWriter out, String sessionID){
+	private void handleCommand(HttpServletResponse response, HttpServletRequest request, PrintWriter out, String sessionID){
 		String cmd = request.getParameter("cmd");
 		String message = request.getParameter("NewText");
 
@@ -148,19 +156,27 @@ public class LargeScaleInfoA2 extends HttpServlet {
 
 			//update expiration timestamp
 			Calendar cal = Calendar.getInstance();
-			cal.add(Calendar.MINUTE, cookieDuration);	
-			sessionTable.get(sessionID).put("expiration-timestamp", df.format(cal.getTime()));
+			cal.add(Calendar.MINUTE, cookieDuration);
+            String newExpr =  df.format(cal.getTime());
+			sessionTable.get(sessionID).put("expiration-timestamp", newExpr);
+			cookieVal+="expiration-timestamp="+newExpr+",";
 
 			//Update message for session
 			if(cmd.equals("Replace")) {
 				System.out.println("Replace command");
-				System.out.println("String length: " + message.length());
+//				System.out.println("String length: " + message.length());
 				sessionTable.get(sessionID).put("message", message);
 				cookieVal+="message="+message+",";
 			} else if(cmd.equals("Refresh")){ //Update relevant session's expiration 
 				System.out.println("Refresh command");
 				cookieVal+="message="+""+",";
 			} 
+
+            //make a new cookie for the request
+//			System.out.println("new cookie for request: " + cookieVal);
+			Cookie newCookie = new Cookie(a2CookieName, cookieVal);
+			response.addCookie(newCookie);
+
 		}
 	}
 
@@ -296,7 +312,7 @@ public class LargeScaleInfoA2 extends HttpServlet {
 	 */
 	private Hashtable<String,String> parseCookieValue(String cookieVal){
 		Hashtable<String,String> parsed= new Hashtable<String,String>();
-		String[] semicolonParsed = cookieVal.split(";");
+		String[] semicolonParsed = cookieVal.split(",");
 		for (String s: semicolonParsed){
 			String[] kv = s.split("=");
 			if (kv.length == 2){
@@ -311,6 +327,7 @@ public class LargeScaleInfoA2 extends HttpServlet {
 
 	/*
 	 * background thread that cleans up expired session from sessionTable
+	 * compares current time to expiration time of session to see if session is expired. 
 	 */
 	private class GarbageCollector extends Thread {
 		GarbageCollector(String name){
