@@ -97,8 +97,8 @@ public class LargeScaleInfoA2 extends HttpServlet {
 			sessionValues.put("message", "");
 			sessionValues.put("expiration-timestamp", df.format(cal.getTime()));
 			try {
-				String ip= InetAddress.getLocalHost().getHostAddress() + ":" + request.getLocalPort();
-				sessionValues.put("location", ip + "_" + "-"); //TODO replace "-" with PP(backup)
+				String ip= InetAddress.getLocalHost().getHostAddress() + "_" + request.getLocalPort();
+				sessionValues.put("location", ip + "_" + "-" + "_" + "-"); //TODO replace "-" with PP(backup) IP and port
 			} catch (UnknownHostException e) {
 				sessionValues.put("location", "Unknown host");
 			}
@@ -340,14 +340,14 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		}
 		parsed.put("sessionID", underscoreParsed[0]+"_"+underscoreParsed[1]+"_"+underscoreParsed[2]);
 		parsed.put("version", underscoreParsed[3]);
-		parsed.put("location", underscoreParsed[4]+"_"+underscoreParsed[5]);
-		parsed.put("expiration-timestamp", underscoreParsed[6]);
+		parsed.put("location", underscoreParsed[4]+"_"+underscoreParsed[5]+"_"+underscoreParsed[6]+"_"+underscoreParsed[7]);
+		parsed.put("expiration-timestamp", underscoreParsed[8]);
 		
-		if (underscoreParsed[7].equals("-")){
+		if (underscoreParsed[9].equals("-")){
 			parsed.put("message", "");
 		}
 		else{
-			parsed.put("message", underscoreParsed[7]);
+			parsed.put("message", underscoreParsed[9]);
 		}
 		
 		System.out.println(parsed);
