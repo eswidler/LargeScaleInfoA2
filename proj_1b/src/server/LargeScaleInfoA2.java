@@ -26,6 +26,8 @@ public class LargeScaleInfoA2 extends HttpServlet {
 
 	//Cookie expiration duration, in minutes
 	private static final int cookieDuration = 1;
+	
+	private static int session_num = 0;
 
 	private static final DateFormat df = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 
@@ -55,6 +57,7 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		out.println(getForm());
 		out.println(getSessionLoc(sessionID));
 		out.println(getSessionExp(sessionID));
+		out.println(getSessionID(sessionID));
 
 		out.println("</body>\n</html>");
 	}
@@ -83,7 +86,7 @@ public class LargeScaleInfoA2 extends HttpServlet {
 		//If no cookie was found, generate a new one
 		if (a2Cookie == null) { 		 
 			System.out.println(" -- new cookie --");
-			sessionID = getNextSessionID();
+			sessionID = getNextSessionID(request);
 
 			// create new timestamp
 			Calendar cal = Calendar.getInstance();
@@ -95,7 +98,7 @@ public class LargeScaleInfoA2 extends HttpServlet {
 			sessionValues.put("expiration-timestamp", df.format(cal.getTime()));
 			try {
 				String ip= InetAddress.getLocalHost().getHostAddress() + ":" + request.getLocalPort();
-				sessionValues.put("location", ip);
+				sessionValues.put("location", ip + "_" + "-"); //TODO replace "-" with PP(backup)
 			} catch (UnknownHostException e) {
 				sessionValues.put("location", "Unknown host");
 			}
@@ -103,10 +106,12 @@ public class LargeScaleInfoA2 extends HttpServlet {
 			
 			
 			sessionTable.put(sessionID + "", sessionValues);
-			String cookieVal = "sessionID="+sessionID+",";
-			for (String key: sessionValues.keySet()){
-				cookieVal+=key+"="+sessionValues.get(key)+",";
-			}
+			String cookieVal = sessionID+"_"
+					+ sessionValues.get("version")+"_"
+					+sessionValues.get("location")+"_"
+					+sessionValues.get("expiration-timestamp")+"_"
+					+((sessionValues.get("message").equals(""))?"-": sessionValues.get("message"));
+			
 			a2Cookie = new Cookie(a2CookieName, cookieVal);
 //			response.addCookie(a2Cookie);
 		}
@@ -120,8 +125,17 @@ public class LargeScaleInfoA2 extends HttpServlet {
 	/*
 	 * Determines the next available sessionID for use
 	 */
-	private String getNextSessionID(){
-		return UUID.randomUUID().toString();
+	private String getNextSessionID(HttpServletRequest request){
+		session_num ++;
+		String sessionID = "";
+		try {
+			sessionID = ""+session_num+"_"+InetAddress.getLocalHost().getHostAddress() + "_" + request.getLocalPort();
+		} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return sessionID;
 	}
 
 	/*
@@ -145,37 +159,43 @@ public class LargeScaleInfoA2 extends HttpServlet {
 			System.out.println("Message is greater than 512 bytes. Request ignored and no cookie made");
 			return;
 		} else {
-			String cookieVal="sessionID="+sessionID+",";
+			String cookieVal=sessionID;
 			//update version number
 			if ((sessionID != null) && sessionTable.contains(sessionID)) {
 				int oldVersion = Integer.parseInt(sessionTable.get(sessionID).get("version"));
 				String newVersion = ((Integer)(oldVersion + 1)).toString();
 				sessionTable.get(sessionID).put("version", newVersion);
-				cookieVal += "version=" +newVersion + ",";
+				cookieVal += "_"+ newVersion;
 			}
 
+			//update location (TODO for now it stays the same)
+				cookieVal += "_" + sessionTable.get(sessionID).get("location");
+				
+			
 			//update expiration timestamp
 			Calendar cal = Calendar.getInstance();
 			cal.add(Calendar.MINUTE, cookieDuration);
             String newExpr =  df.format(cal.getTime());
 			sessionTable.get(sessionID).put("expiration-timestamp", newExpr);
-			cookieVal+="expiration-timestamp="+newExpr+",";
+			cookieVal+="_"+newExpr;
 
 			//Update message for session
 			if(cmd.equals("Replace")) {
 				System.out.println("Replace command");
 //				System.out.println("String length: " + message.length());
 				sessionTable.get(sessionID).put("message", message);
-				cookieVal+="message="+message+",";
+				cookieVal+="_"+message;
 			} else if(cmd.equals("Refresh")){ //Update relevant session's expiration 
 				System.out.println("Refresh command");
-				cookieVal+="message="+""+",";
+				cookieVal+="_"+"-";
 			} 
 
             //make a new cookie for the request
-//			System.out.println("new cookie for request: " + cookieVal);
+			System.out.println("new cookie for request: " + cookieVal);
 			Cookie newCookie = new Cookie(a2CookieName, cookieVal);
 			response.addCookie(newCookie);
+			System.out.println(cookieVal);
+
 
 		}
 	}
@@ -307,21 +327,31 @@ public class LargeScaleInfoA2 extends HttpServlet {
 	}	
 
 	/*cookieVal is the string used as the value of a Cookie
+	 *Includes, in this exact order: sessionID, version, location, expiration-timestamp, message
 	 *Each information of the cookie is in the following format: 'key=value,'
 	 *parseCookieValue parses the string into a Hashtable
 	 */
 	private Hashtable<String,String> parseCookieValue(String cookieVal){
 		Hashtable<String,String> parsed= new Hashtable<String,String>();
-		String[] semicolonParsed = cookieVal.split(",");
-		for (String s: semicolonParsed){
-			String[] kv = s.split("=");
-			if (kv.length == 2){
-				parsed.put(kv[0], kv[1]);
-			}
-			else{
-				parsed.put(kv[0], "");
-			}
+		String[] underscoreParsed = cookieVal.split("_");
+		if (underscoreParsed.length != 5){
+			System.out.println("array is " + underscoreParsed.length + " components long");
+			System.out.println(cookieVal);
 		}
+		parsed.put("sessionID", underscoreParsed[0]+"_"+underscoreParsed[1]+"_"+underscoreParsed[2]);
+		parsed.put("version", underscoreParsed[3]);
+		parsed.put("location", underscoreParsed[4]+"_"+underscoreParsed[5]);
+		parsed.put("expiration-timestamp", underscoreParsed[6]);
+		
+		if (underscoreParsed[7].equals("-")){
+			parsed.put("message", "");
+		}
+		else{
+			parsed.put("message", underscoreParsed[7]);
+		}
+		
+		System.out.println(parsed);
+		
 		return parsed;
 	}
 
